@@ -1,17 +1,17 @@
-// Asks Gemini for one deep, "would you still do it" style question,
+// Asks Groq for one deep, "would you still do it" style question,
 // then inserts it into the Supabase `quotes` table for today's (UTC) date.
 //
 // Requires these environment variables (set as GitHub Actions secrets):
-//   GEMINI_API_KEY
+//   GROQ_API_KEY
 //   SUPABASE_URL
 //   SUPABASE_SERVICE_ROLE_KEY   <- the "service_role" key, NOT the anon key
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!GEMINI_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("Missing one of GEMINI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY");
+if (!GROQ_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error("Missing one of GROQ_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY");
   process.exit(1);
 }
 
@@ -30,29 +30,32 @@ Rules:
 Respond with ONLY the question itself. No quotation marks, no preamble, no explanation, no extra commentary.`;
 
 async function getQuestion() {
-  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent";
+  const url = "https://api.groq.com/openai/v1/chat/completions";
   const res = await fetch(url, {
     method: "POST",
     headers: {
-      "x-goog-api-key": GEMINI_API_KEY,
+      Authorization: `Bearer ${GROQ_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: PROMPT }] }],
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: PROMPT }],
+      temperature: 1,
+      max_tokens: 200,
     }),
   });
 
   if (!res.ok) {
-    throw new Error(`Gemini API error: ${res.status} ${await res.text()}`);
+    throw new Error(`Groq API error: ${res.status} ${await res.text()}`);
   }
 
   const data = await res.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const text = data.choices?.[0]?.message?.content;
   if (!text) {
-    throw new Error("Gemini response had no text: " + JSON.stringify(data));
+    throw new Error("Groq response had no text: " + JSON.stringify(data));
   }
 
-  // Strip stray quote marks / whitespace Gemini sometimes adds anyway.
+  // Strip stray quote marks / whitespace the model sometimes adds anyway.
   return text.trim().replace(/^["“]+|["”]+$/g, "");
 }
 
