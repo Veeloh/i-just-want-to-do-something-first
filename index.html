@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Daily Question</title>
+<title>i just want to do something first</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;1,400;1,500&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
@@ -190,14 +190,17 @@
 
 <script>
   // ---- Fill these in after setting up Supabase (see README.md) ----
-  const SUPABASE_URL = "https://qquvosrjaowgeigqswly.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxdXZvc3JqYW93Z2VpZ3Fzd2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzNjQ0NzgsImV4cCI6MjEwNTk0MDQ3OH0.rhN2dd2Wbx_H65RfiAMeL0CJSJjNzXq57GVxDycibMU";
+  const SUPABASE_URL = "YOUR_SUPABASE_URL";
+  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
   // -------------------------------------------------------------
 
   const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   function isoDate(d) {
-    return d.toISOString().slice(0, 10);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return year + "-" + month + "-" + day;
   }
 
   function formatDate(iso) {
