@@ -45,15 +45,19 @@ async function pickModel() {
   const { data } = await res.json();
   const ids = data.map((m) => m.id);
 
-  // Skip anything that's clearly not a general text chat model.
-  const excluded = /whisper|tts|guard|vision|prompt-guard/i;
-  const candidates = ids.filter((id) => !excluded.test(id));
+  // Only consider ids from known general-purpose text chat model families.
+  // (An allowlist, rather than trying to blocklist every audio/vision/TTS
+  // model Groq might add, since new non-text models show up over time.)
+  const allowed = /llama|mixtral|gemma|qwen|deepseek|gpt-oss/i;
+  // Some allowed-looking ids are still not plain text chat models
+  // (e.g. Llama Guard is a moderation classifier, not a chat model).
+  const excluded = /guard|vision|instruct-audio/i;
 
-  // Prefer a well-known "versatile" large Llama model if one exists,
-  // otherwise fall back to any remaining candidate.
+  const candidates = ids.filter((id) => allowed.test(id) && !excluded.test(id));
+
   const preferred =
     candidates.find((id) => /llama.*70b.*versatile/i.test(id)) ||
-    candidates.find((id) => /llama/i.test(id)) ||
+    candidates.find((id) => /llama.*70b/i.test(id)) ||
     candidates[0];
 
   if (!preferred) {
