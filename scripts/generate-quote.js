@@ -29,7 +29,43 @@ Rules:
 
 Respond with ONLY the question itself. No quotation marks, no preamble, no explanation, no extra commentary.`;
 
+// Groq periodically retires/renames model ids. Rather than hardcode one that
+// can go stale, ask Groq what's currently available and pick a sensible
+// general-purpose chat model from the list. Set the GROQ_MODEL secret to
+// force a specific model id instead, if you ever want to.
+async function pickModel() {
+  if (process.env.GROQ_MODEL) return process.env.GROQ_MODEL;
+
+  const res = await fetch("https://api.groq.com/openai/v1/models", {
+    headers: { Authorization: `Bearer ${GROQ_API_KEY}` },
+  });
+  if (!res.ok) {
+    throw new Error(`Groq models list error: ${res.status} ${await res.text()}`);
+  }
+  const { data } = await res.json();
+  const ids = data.map((m) => m.id);
+
+  // Skip anything that's clearly not a general text chat model.
+  const excluded = /whisper|tts|guard|vision|prompt-guard/i;
+  const candidates = ids.filter((id) => !excluded.test(id));
+
+  // Prefer a well-known "versatile" large Llama model if one exists,
+  // otherwise fall back to any remaining candidate.
+  const preferred =
+    candidates.find((id) => /llama.*70b.*versatile/i.test(id)) ||
+    candidates.find((id) => /llama/i.test(id)) ||
+    candidates[0];
+
+  if (!preferred) {
+    throw new Error("No usable chat model found in Groq's model list: " + JSON.stringify(ids));
+  }
+  return preferred;
+}
+
 async function getQuestion() {
+  const model = await pickModel();
+  console.log("Using Groq model:", model);
+
   const url = "https://api.groq.com/openai/v1/chat/completions";
   const res = await fetch(url, {
     method: "POST",
@@ -38,7 +74,7 @@ async function getQuestion() {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
+      model,
       messages: [{ role: "user", content: PROMPT }],
       temperature: 1,
       max_tokens: 200,
