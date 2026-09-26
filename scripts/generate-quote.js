@@ -82,7 +82,8 @@ async function getQuestion() {
       model,
       messages: [{ role: "user", content: PROMPT }],
       temperature: 1,
-      max_tokens: 200,
+      max_tokens: 800, // some Groq models "think" in hidden tokens before answering; needs headroom
+      ...(/gpt-oss|deepseek-r1|qwq/i.test(model) ? { reasoning_effort: "low" } : {}),
     }),
   });
 
