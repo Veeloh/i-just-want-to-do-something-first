@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Question</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;1,400;1,500&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root {
+    --ink: #14171a;
+    --paper: #ece6d9;
+    --muted: #9a9488;
+    --hair: rgba(236, 230, 217, 0.14);
+    --sage: #7c9885;
+    --sage-dim: #647e70;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  body {
+    font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 8vh 24px 10vh;
+  }
+
+  main {
+    width: 100%;
+    max-width: 600px;
+  }
+
+  .date-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-align: center;
+    margin-bottom: 2.2rem;
+    letter-spacing: 0.02em;
+  }
+
+  .quote {
+    font-family: 'Newsreader', serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(1.5rem, 4.5vw, 2.2rem);
+    line-height: 1.5;
+    text-align: center;
+    color: var(--paper);
+    margin: 0 0 3rem;
+  }
+
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    font-size: 1rem;
+    margin: 0 0 3rem;
+  }
+
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+
+  textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--hair);
+    color: var(--paper);
+    font-family: inherit;
+    font-size: 1rem;
+    line-height: 1.5;
+    padding: 0.4rem 0.1rem 0.8rem;
+    resize: none;
+    min-height: 4.5rem;
+  }
+
+  textarea:focus {
+    outline: none;
+    border-bottom-color: var(--sage);
+  }
+
+  textarea::placeholder { color: var(--muted); }
+
+  .submit-row {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  button {
+    background: var(--sage);
+    color: var(--ink);
+    border: none;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 0.55rem 1.3rem;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+
+  button:hover { background: var(--sage-dim); }
+  button:disabled { opacity: 0.5; cursor: default; }
+
+  .confirmation {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.95rem;
+    padding: 0.6rem 0;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--hair);
+    margin: 4.5rem 0 2.5rem;
+  }
+
+  .yesterday-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+
+  .yesterday-quote {
+    font-family: 'Newsreader', serif;
+    font-style: italic;
+    font-size: 1.05rem;
+    color: var(--muted);
+    line-height: 1.5;
+    margin: 0 0 2.2rem;
+  }
+
+  .responses {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .response {
+    padding: 1rem 0;
+    border-top: 1px solid var(--hair);
+    font-size: 0.98rem;
+    line-height: 1.55;
+    color: var(--paper);
+    white-space: pre-wrap;
+  }
+
+  .response:last-child {
+    border-bottom: 1px solid var(--hair);
+  }
+
+  .yesterday-empty {
+    color: var(--muted);
+    font-size: 0.95rem;
+    padding: 1rem 0;
+    border-top: 1px solid var(--hair);
+    border-bottom: 1px solid var(--hair);
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="date-label" id="today-label"></div>
+  <div id="today-quote-slot"></div>
+
+  <form id="answer-form">
+    <textarea id="answer-text" placeholder="Write your answer&hellip;" maxlength="2000"></textarea>
+    <div class="submit-row">
+      <button type="submit" id="submit-btn">Submit</button>
+    </div>
+  </form>
+  <div class="confirmation" id="confirmation" style="display:none;">Thanks. Come back tomorrow to see what everyone said.</div>
+
+  <hr class="divider">
+
+  <div class="yesterday-label" id="yesterday-label"></div>
+  <div id="yesterday-quote-slot"></div>
+  <div class="responses" id="responses-slot"></div>
+</main>
+
+<script>
+  // ---- Fill these in after setting up Supabase (see README.md) ----
+  const SUPABASE_URL = "YOUR_SUPABASE_URL";
+  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+  // -------------------------------------------------------------
+
+  const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  function isoDate(d) {
+    return d.toISOString().slice(0, 10);
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso + "T00:00:00");
+    return d.toLocaleDateString(undefined, { month: "long", day: "numeric" });
+  }
+
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  const todayISO = isoDate(today);
+  const yesterdayISO = isoDate(yesterday);
+
+  document.getElementById("today-label").textContent = formatDate(todayISO);
+  document.getElementById("yesterday-label").textContent = "Yesterday · " + formatDate(yesterdayISO);
+
+  async function loadToday() {
+    const slot = document.getElementById("today-quote-slot");
+    const { data, error } = await client
+      .from("quotes")
+      .select("text")
+      .eq("date", todayISO)
+      .maybeSingle();
+
+    if (error || !data) {
+      slot.innerHTML = '<p class="empty">No question posted yet today.</p>';
+      document.getElementById("answer-form").style.display = "none";
+      return;
+    }
+    slot.innerHTML = '<p class="quote">&ldquo;' + escapeHTML(data.text) + '&rdquo;</p>';
+  }
+
+  async function loadYesterday() {
+    const quoteSlot = document.getElementById("yesterday-quote-slot");
+    const responsesSlot = document.getElementById("responses-slot");
+
+    const { data: quote } = await client
+      .from("quotes")
+      .select("text")
+      .eq("date", yesterdayISO)
+      .maybeSingle();
+
+    if (!quote) {
+      quoteSlot.innerHTML = '<p class="yesterday-quote">No question was posted yesterday.</p>';
+      return;
+    }
+    quoteSlot.innerHTML = '<p class="yesterday-quote">&ldquo;' + escapeHTML(quote.text) + '&rdquo;</p>';
+
+    const { data: responses } = await client
+      .from("responses")
+      .select("text")
+      .eq("date", yesterdayISO)
+      .order("created_at", { ascending: true });
+
+    if (!responses || responses.length === 0) {
+      responsesSlot.innerHTML = '<p class="yesterday-empty">No one answered yesterday\'s question.</p>';
+      return;
+    }
+    responsesSlot.innerHTML = responses
+      .map(r => '<div class="response">' + escapeHTML(r.text) + '</div>')
+      .join("");
+  }
+
+  function escapeHTML(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  document.getElementById("answer-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const textarea = document.getElementById("answer-text");
+    const btn = document.getElementById("submit-btn");
+    const text = textarea.value.trim();
+    if (!text) return;
+
+    btn.disabled = true;
+    const { error } = await client.from("responses").insert({ date: todayISO, text: text });
+    btn.disabled = false;
+
+    if (error) {
+      alert("Something went wrong submitting your answer. Please try again.");
+      return;
+    }
+
+    document.getElementById("answer-form").style.display = "none";
+    document.getElementById("confirmation").style.display = "block";
+  });
+
+  loadToday();
+  loadYesterday();
+</script>
+</body>
+</html>
