@@ -25,6 +25,7 @@ Rules:
 - Touch on themes like loss, memory, regret, love, mortality, identity, or connection.
 - Answerable in a few sentences, not an essay.
 - One to three sentences long.
+- Must end with a question mark.
 - Avoid clichés like "one superpower" or "biggest fear."
 
 Respond with ONLY the question itself. No quotation marks, no preamble, no explanation, no extra commentary.`;
@@ -96,11 +97,23 @@ async function getQuestion() {
   }
 
   // Strip stray quote marks / whitespace the model sometimes adds anyway.
-  return text.trim().replace(/^["“]+|["”]+$/g, "");
+  let cleaned = text.trim().replace(/^["“]+|["”]+$/g, "");
+
+  // Belt-and-suspenders: make sure it ends in a question mark even if the
+  // model forgets, so the prompt above is a guarantee, not just a request.
+  if (!cleaned.endsWith("?")) {
+    cleaned = cleaned.replace(/[.!]+$/, "") + "?";
+  }
+
+  return cleaned;
 }
 
 async function saveQuestion(question) {
-  const today = new Date().toISOString().slice(0, 10); // UTC date, matches the cron's UTC schedule
+  // Use Calgary's local calendar date, not UTC — otherwise a run that fires
+  // at UTC midnight (6pm the evening before in Calgary) tags the question
+  // with tomorrow's date. Handles the MDT/MST switch automatically.
+  // Change the timeZone value below if you want a different reference city.
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Edmonton" });
 
   const res = await fetch(`${SUPABASE_URL}/rest/v1/quotes`, {
     method: "POST",
